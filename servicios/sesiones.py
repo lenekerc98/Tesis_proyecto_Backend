@@ -87,6 +87,22 @@ def obtener_usuarios(db: Session):
     return db.query(Usuario).order_by(Usuario.fecha_creacion.desc()).all()
 
 # ------------------------------------------------------------------
+# CONSULTAS USUARIOS POR NOMBRE
+# ------------------------------------------------------------------
+def obtener_usuario_nombre(db: Session, nombre: str):
+    return db.query(Usuario).filter(Usuario.nombre_completo.ilike(f"%{nombre}%")).order_by(Usuario.fecha_creacion.desc()).all()
+
+#--------------------------------------------------
+#CONSULTAR USUARIOS INACTIVOS POR NOMBRE
+# ------------------------------------------------------------------
+def obtener_usuarios_inactivos_nombre(db: Session, nombre: str):
+    return db.query(Usuario).filter(
+        Usuario.nombre_completo.ilike(f"%{nombre}%"),
+        Usuario.usuario_activo == False
+    ).order_by(Usuario.fecha_creacion.desc()).all()
+
+
+# ------------------------------------------------------------------
 # CONSULTAS ESPECIES DE AVE
 # ------------------------------------------------------------------
 def obtener_aves(db: Session):
@@ -144,6 +160,31 @@ def actualizar_usuario(
 
     if "usuario_activo" in datos:
         usuario.usuario_activo = datos["usuario_activo"]
+
+    db.commit()
+    db.refresh(usuario)
+
+    return usuario
+
+# ------------------------------------------------------------------
+# REACTIVAR USUARIO
+# ------------------------------------------------------------------ 
+def reactivar_usuario(
+    db: Session,
+    usuario_id: int
+):
+    if usuario.role_id == ADMIN_ROLE_ID:
+
+        usuario = db.query(Usuario).filter(
+        Usuario.id_usuario == usuario_id
+        ).first()
+    else:
+        raise HTTPException(403, "No autorizado para reactivar usuarios")
+
+    if not usuario:
+        raise HTTPException(404, "Usuario no encontrado")
+
+    usuario.usuario_activo = True
 
     db.commit()
     db.refresh(usuario)

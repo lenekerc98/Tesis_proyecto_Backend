@@ -50,6 +50,7 @@ class EjecucionInferencia(Base):
     top_5 = Column(JSONB)
     tiempo_ejecucion = Column(Float)
     fecha_ejecuta = Column(DateTime(timezone=True), server_default=func.now())
+    meta_audio = relationship("MetadatoAudio", back_populates="id_inferencia_rel", uselist=False)
 
 class LogErrorSistema(Base):
     __tablename__ = "logs_error_sistema"
@@ -58,6 +59,7 @@ class LogErrorSistema(Base):
     fuente = Column(String, nullable=True)
     fecha_general_log = Column(DateTime(timezone=True), server_default=func.now())
     id_usuario = Column(Integer, ForeignKey("usuarios.id_usuario"), nullable=False)
+    usuario = relationship("Usuario")
 
 class MetadatoAudio(Base):
     __tablename__ = "metadata_audio"
@@ -71,3 +73,4 @@ class MetadatoAudio(Base):
     latitud = Column(Float, nullable=True)
     id_usuario = Column(Integer, ForeignKey("usuarios.id_usuario"), nullable=False)
     id_inferencia = Column(Integer, ForeignKey("ejecuciones_inferencias.log_id"), nullable=True)
+    id_inferencia_rel = relationship("EjecucionInferencia", back_populates="meta_audio")

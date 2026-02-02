@@ -30,6 +30,7 @@ def obtener_inferencias(db: Session, usuario):
     return (
         query
         .filter(EjecucionInferencia.id_usuario == usuario.id_usuario)
+        .outerjoin(MetadatoAudio, EjecucionInferencia.log_id == MetadatoAudio.id_inferencia)
         .order_by(EjecucionInferencia.fecha_ejecuta.desc())
         .all()
     )
@@ -41,6 +42,7 @@ def obtener_inferencias_admin(db: Session):
 
     return (
         query
+        .outerjoin(MetadatoAudio, EjecucionInferencia.log_id == MetadatoAudio.id_inferencia)
         .order_by(EjecucionInferencia.fecha_ejecuta.desc())
         .all()
     )

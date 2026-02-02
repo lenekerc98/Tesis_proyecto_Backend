@@ -1,6 +1,6 @@
 # servicios/logs_error.py
 from sqlalchemy.orm import Session
-from db.modelos import LogErrorSistema
+from db.modelos import LogErrorSistema, Usuario
 
 def registrar_error_sistema(
     db: Session,
@@ -23,6 +23,7 @@ def obtener_logs_error(db: Session, limite: int):
 
     return (
         db.query(LogErrorSistema)
+        .outerjoin(Usuario, LogErrorSistema.id_usuario == Usuario.id_usuario)
         .order_by(LogErrorSistema.fecha_general_log.desc())
         .limit(limite)
         .all()

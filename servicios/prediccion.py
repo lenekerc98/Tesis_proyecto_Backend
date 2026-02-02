@@ -1,4 +1,4 @@
-# app/services/prediccion.py
+# app/servicios/prediccion.py
 import os
 import numpy as np
 import librosa
@@ -9,9 +9,7 @@ from db.modelos import Ave
 
 # ---------------- CONFIGURACIÓN ----------------
 MODEL_PATH = (
-    "C:/Users/adria/OneDrive/Escritorio/Adrian/Universidad/"
-    "TITULACION/DESARROLLO DE SF/ENTRENAMIENTO/DATASET_NPY/"
-    "modelo_cnn/best_model.keras"
+    "C:/LNCZ/Tesis_aves_2025/Tesis_Proyecto/BACKEND/modelo_cnn/best_model.keras"
 )
 
 TARGET_SR = 44100
@@ -108,6 +106,7 @@ def predecir_audio(
         resultados.append({
             "id_ave": int(idx),
             "nombre_cientifico": ave.nombre_cientifico if ave else "desconocido",
+            "nombre": ave.nombre if ave else "desconocido",
             "probabilidad": float(probs[idx])
         })
 
