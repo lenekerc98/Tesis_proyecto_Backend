@@ -16,7 +16,12 @@ app.add_middleware(
 def read_root():
     return {"message": "Backend de Tesis de Aves funcionando"}
 
+@app.get("/fast_health_check")
+def health():
+    return {"status": "ok"}
+
 app.include_router(estado_procesos.router)
 app.include_router(usuarios.router)
 app.include_router(inferencias.router)
 app.include_router(admin.router)
+
