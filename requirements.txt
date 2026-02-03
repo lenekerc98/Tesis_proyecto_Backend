@@ -68,7 +68,6 @@ soundfile==0.13.1
 soxr==1.0.0
 SQLAlchemy==2.0.45
 starlette==0.50.0
-tensorboard==2.20.0
 tensorboard-data-server==0.7.2
 tensorflow-cpu==2.15.0
 tensorflow-estimator==2.15.0
@@ -80,6 +79,7 @@ urllib3==2.6.3
 uvicorn==0.40.0
 Werkzeug==3.1.5
 wrapt==1.14.1
+
 
 
 
