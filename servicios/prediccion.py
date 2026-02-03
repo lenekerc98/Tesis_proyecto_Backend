@@ -2,7 +2,17 @@
 import os
 import numpy as np
 import librosa
+
+# 🔽 AGREGAR ESTO ANTES DE importar tensorflow
+os.environ["OMP_NUM_THREADS"] = "1"
+os.environ["TF_NUM_INTRAOP_THREADS"] = "1"
+os.environ["TF_NUM_INTEROP_THREADS"] = "1"
+os.environ["CUDA_VISIBLE_DEVICES"] = "-1"
+
 import tensorflow as tf
+tf.config.threading.set_intra_op_parallelism_threads(1)
+tf.config.threading.set_inter_op_parallelism_threads(1)
+
 
 from sqlalchemy.orm import Session
 from db.modelos import Ave
