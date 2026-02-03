@@ -19,7 +19,16 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+@app.get("/")
+def read_root():
+    return {"message": "Backend de Tesis de Aves funcionando"}
 app.include_router(estado_procesos.router)
 app.include_router(usuarios.router)
 app.include_router(inferencias.router)
 app.include_router(admin.router)
+
+if __name__ == "__main__":
+    import uvicorn
+    import os
+    port = int(os.environ.get("PORT", 10000))
+    uvicorn.run("app.main:app", host="0.0.0.0", port=port)
