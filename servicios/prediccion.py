@@ -2,24 +2,13 @@
 import os
 import numpy as np
 import librosa
-
-# 🔽 AGREGAR ESTO ANTES DE importar tensorflow
-os.environ["OMP_NUM_THREADS"] = "1"
-os.environ["TF_NUM_INTRAOP_THREADS"] = "1"
-os.environ["TF_NUM_INTEROP_THREADS"] = "1"
-os.environ["CUDA_VISIBLE_DEVICES"] = "-1"
-
 import tensorflow as tf
-tf.config.threading.set_intra_op_parallelism_threads(1)
-tf.config.threading.set_inter_op_parallelism_threads(1)
-
 
 from sqlalchemy.orm import Session
 from db.modelos import Ave
 
 # ---------------- CONFIGURACIÓN ----------------
-BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-MODEL_PATH = os.path.join(BASE_DIR, "..", "modelo_cnn", "best_model.keras")
+MODEL_PATH = "modelo_cnn/best_model.keras"
 
 TARGET_SR = 44100
 N_MELS = 128
@@ -27,15 +16,8 @@ TARGET_FRAMES = 216
 FMIN = 500
 FMAX = 11025
 
-model = None
-
-def get_model():
-    global model
-    if model is None:
-        print("🔄 Cargando modelo de IA...")
-        model = tf.keras.models.load_model(MODEL_PATH)
-        print("✅ Modelo cargado")
-    return model
+# Cargar modelo UNA sola vez
+model = tf.keras.models.load_model(MODEL_PATH)
 
 #Limpieza de audio.
 
@@ -105,7 +87,7 @@ def predecir_audio(
     X = S[np.newaxis, ..., np.newaxis]
 
     # 4. Inferencia
-    probs = get_model().predict(X)[0]
+    probs = model.predict(X)[0]
 
     # 5 . Top-N
     top_indices = np.argsort(probs)[::-1][:top_n]
