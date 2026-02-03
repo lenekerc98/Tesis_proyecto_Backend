@@ -8,7 +8,7 @@ from sqlalchemy.orm import Session
 from db.modelos import Ave
 
 # ---------------- CONFIGURACIÓN ----------------
-MODEL_PATH = "modelo_cnn/modelo_compatible.h5"
+MODEL_PATH = "modelo_cnn/best_model.keras"
 
 TARGET_SR = 44100
 N_MELS = 128
@@ -110,4 +110,5 @@ def predecir_audio(
 
     return resultados
 #-----------------------------------------------------------
+
 
