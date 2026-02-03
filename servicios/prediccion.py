@@ -17,8 +17,15 @@ TARGET_FRAMES = 216
 FMIN = 500
 FMAX = 11025
 
-# Cargar modelo UNA sola vez
-model = tf.keras.models.load_model(MODEL_PATH)
+model = None
+
+def get_model():
+    global model
+    if model is None:
+        print("🔄 Cargando modelo de IA...")
+        model = tf.keras.models.load_model(MODEL_PATH)
+        print("✅ Modelo cargado")
+    return model
 
 #Limpieza de audio.
 
@@ -88,7 +95,7 @@ def predecir_audio(
     X = S[np.newaxis, ..., np.newaxis]
 
     # 4. Inferencia
-    probs = model.predict(X)[0]
+    probs = get_model().predict(X)[0]
 
     # 5 . Top-N
     top_indices = np.argsort(probs)[::-1][:top_n]
