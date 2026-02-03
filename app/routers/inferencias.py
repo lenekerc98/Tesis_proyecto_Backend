@@ -20,7 +20,7 @@ ALLOWED_TYPES = ["audio/wav", "audio/mpeg", "audio/webm", "audio/mp3", "audio/we
 MAX_SIZE_MB = 100
 MIN_DURACION = 1.0
 MAX_DURACION = 60.0
-FFMPEG_PATH = r"C:\ffmpeg\bin\ffmpeg.exe"
+FFMPEG_PATH = "ffmpeg"
 
 @router.post("/procesar_inferencia")
 async def upload_audio(
