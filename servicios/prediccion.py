@@ -8,9 +8,8 @@ from sqlalchemy.orm import Session
 from db.modelos import Ave
 
 # ---------------- CONFIGURACIÓN ----------------
-MODEL_PATH = (
-    "C:/LNCZ/Tesis_aves_2025/Tesis_Proyecto/BACKEND/modelo_cnn/best_model.keras"
-)
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+MODEL_PATH = os.path.join(BASE_DIR, "..", "modelo_cnn", "best_model.keras")
 
 TARGET_SR = 44100
 N_MELS = 128
