@@ -29,6 +29,7 @@ class Ave(Base):
     nombre_cientifico = Column(String, nullable=False)
     localizaciones = Column(JSONB, nullable=True)
     url_imagen = Column(String, nullable=True)
+    url_audio = Column(String, nullable=True)
 
 class SesionUsuario(Base):
     __tablename__ = "sesiones_usuarios"
@@ -73,4 +74,5 @@ class MetadatoAudio(Base):
     latitud = Column(Float, nullable=True)
     id_usuario = Column(Integer, ForeignKey("usuarios.id_usuario"), nullable=False)
     id_inferencia = Column(Integer, ForeignKey("ejecuciones_inferencias.log_id"), nullable=True)
+
     id_inferencia_rel = relationship("EjecucionInferencia", back_populates="meta_audio")
