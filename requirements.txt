@@ -16,7 +16,7 @@ dnspython==2.8.0
 ecdsa==0.19.1
 email-validator==2.3.0
 exceptiongroup==1.3.1
-fastapi==0.128.0
+fastapi==0.115.6
 Flask==3.1.2
 flask-cors==6.0.2
 flatbuffers==25.12.19
@@ -26,12 +26,12 @@ greenlet==3.3.0
 gunicorn==21.2.0
 grpcio==1.76.0
 h11==0.16.0
-h5py==3.15.1
+h5py==3.12.1
 idna==3.11
 itsdangerous==2.2.0
 Jinja2==3.1.6
 joblib==1.5.3
-keras==3.5.0
+keras==3.8.0
 lazy_loader==0.4
 libclang==18.1.1
 librosa==0.11.0
@@ -42,7 +42,7 @@ MarkupSafe==3.0.3
 mdurl==0.1.2
 msgpack==1.1.2
 namex==0.1.0
-numba==0.63.1
+numba==0.62.1
 numpy==1.26.4
 opt_einsum==3.4.0
 optree==0.18.0
@@ -53,33 +53,33 @@ pooch==1.8.2
 psycopg2-binary==2.9.11
 pyasn1==0.6.1
 pycparser==2.23
-pydantic==2.12.5
-pydantic_core==2.41.5
+pydantic==2.10.5
 Pygments==2.19.2
 python-jose==3.5.0
 python-multipart==0.0.21
-requests==2.32.5
+requests==2.32.
 rich==14.2.0
 rsa==4.9.1
 scikit-learn==1.7.2
-scipy==1.15.3
+scipy==1.15.1
 six==1.17.0
 soundfile==0.13.1
 soxr==1.0.0
-SQLAlchemy==2.0.45
+SQLAlchemy==2.0.37
 starlette==0.50.0
-tensorboard-data-server==0.7.2
-tensorflow-cpu==2.19.0
-tensorflow-estimator==2.15.0
+tensorboard==2.18.0
+tensorflow==2.18.0
 termcolor==3.3.0
 threadpoolctl==3.6.0
 typing-inspection==0.4.2
 typing_extensions==4.15.0
 urllib3==2.6.3
-uvicorn==0.40.0
+uvicorn==0.34.0
 Werkzeug==3.1.5
 wrapt==1.14.1
 python-dotenv==1.0.1
+ml-dtypes=0.4.1
+psycopg2=2.9.11
 
 
 
