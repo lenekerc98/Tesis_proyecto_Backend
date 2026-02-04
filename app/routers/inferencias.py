@@ -235,6 +235,7 @@ def listar_aves(
             "nombre_cientifico": u.nombre_cientifico,
             "nombre": u.nombre,
             "imagen_url": u.url_imagen,
+            "audio_url": u.url_audio
         }
         for u in aves
     ]
@@ -278,4 +279,5 @@ def predicciones_mas_frecuentes_usuario(
             }
             for r in resultados
         ]
+
     }
