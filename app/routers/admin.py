@@ -121,10 +121,14 @@ def listar_inferencias(
             "log_id": i.log_id,
             "prediccion": i.prediccion_especie,
             "confianza": i.confianza,
-            "top_5": i.top_5,
             "tiempo_ejecucion": i.tiempo_ejecucion,
             "fecha": i.fecha_ejecuta,
-            "usuario": db.query(modelos.Usuario).filter(modelos.Usuario.id_usuario == i.id_usuario).first().nombre_completo if i.id_usuario else "Anónimo"
+            "usuario": db.query(modelos.Usuario).filter(modelos.Usuario.id_usuario == i.id_usuario).first().nombre_completo if i.id_usuario else "Anónimo",
+            "ubicacion": i.meta_audio.localizacion if i.meta_audio else "No disponible",
+            "url_imagen": obtener_imagen_ave(db, i.prediccion_especie),
+            "latitud": i.meta_audio.latitud if i.meta_audio else None,
+            "longitud": i.meta_audio.longitud if i.meta_audio else None,
+            "top_5": i.top_5
         }
         for i in inferencias
     ]
@@ -212,4 +216,5 @@ def reactivar_usuario(
 
     return {
         "mensaje": f"Usuario {usuario.nombre_completo} reactivado correctamente"
+
     }
