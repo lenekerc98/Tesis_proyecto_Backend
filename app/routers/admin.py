@@ -7,6 +7,7 @@ from datetime import datetime
 from db import modelos
 from servicios.hist_inferencias import obtener_inferencias_admin
 # IMPORTANTE: Agregamos 'actualizar_usuario' a los imports
+from servicios.prediccion import obtener_imagen_ave
 from servicios.sesiones import actualizar_usuario, obtener_sesiones_admin, obtener_usuario_nombre, obtener_usuarios, obtener_usuarios_inactivos_nombre
 from db.database import get_db
 from servicios.seguridad import get_current_user, require_admin
@@ -218,3 +219,4 @@ def reactivar_usuario(
         "mensaje": f"Usuario {usuario.nombre_completo} reactivado correctamente"
 
     }
+
