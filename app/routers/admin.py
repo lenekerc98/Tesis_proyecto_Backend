@@ -217,6 +217,4 @@ def reactivar_usuario(
 
     return {
         "mensaje": f"Usuario {usuario.nombre_completo} reactivado correctamente"
-
     }
-
