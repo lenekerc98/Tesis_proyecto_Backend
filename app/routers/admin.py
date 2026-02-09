@@ -197,63 +197,60 @@ def obtener_estadisticas_dashboard(
     db: Session = Depends(get_db),
     usuario = Depends(require_admin)
 ):
-    hoy = datetime.now().date()
+    ahora = datetime.now()
+    hoy = ahora.date()
     inicio_semana = hoy - timedelta(days=hoy.weekday())
 
-    # 1. USUARIOS CON SESIÓN HOY
-    # CORRECCIÓN IMPORTANTE: Usamos modelos.SesionUsuario, no modelos.Sesion
+    # DEFINICIÓN DE "ONLINE": Usuarios que iniciaron sesión hace menos de 30 minutos
+    limite_online = ahora - timedelta(minutes=30)
+
+    # 1. LOGINS HOY (Total acumulado del día)
     logins_hoy = db.query(modelos.SesionUsuario).filter(
         func.date(modelos.SesionUsuario.fecha_ingreso) == hoy,
         modelos.SesionUsuario.estado == "EXITOSO"
     ).count()
 
-    # 2. TOTAL USUARIOS ACTIVOS
-    usuarios_activos = db.query(modelos.Usuario).filter(modelos.Usuario.usuario_activo == True).count()
+    # 2. USUARIOS SIMULTÁNEOS (ONLINE AHORA)
+    # Buscamos sesiones exitosas recientes y usamos distinct para no contar doble al mismo usuario
+    usuarios_online = db.query(modelos.SesionUsuario.id_usuario)\
+        .filter(
+            modelos.SesionUsuario.fecha_ingreso >= limite_online,
+            modelos.SesionUsuario.estado == "EXITOSO"
+        )\
+        .distinct()\
+        .count()
 
-    # 3. FUNCIÓN AUXILIAR TOP AVES
+    # 3. TOP AVES (Tu lógica original)
     def obtener_top_ave(filtro_fecha=None):
         query = db.query(
             modelos.EjecucionInferencia.prediccion_especie,
             func.count(modelos.EjecucionInferencia.prediccion_especie).label('total')
         )
-        
         if filtro_fecha:
             query = query.filter(modelos.EjecucionInferencia.fecha_ejecuta >= filtro_fecha)
-            
         top = query.group_by(modelos.EjecucionInferencia.prediccion_especie)\
                    .order_by(desc('total'))\
                    .first()
-        
         if top:
             try:
-                # Obtenemos la imagen usando tu función existente
-                url_imagen = obtener_imagen_ave(db, top.prediccion_especie)
+                url = obtener_imagen_ave(db, top.prediccion_especie)
             except:
-                url_imagen = None
-
-            return {
-                "especie": top.prediccion_especie, 
-                "total": top.total, 
-                "imagen": url_imagen
-            }
+                url = None
+            return {"especie": top.prediccion_especie, "total": top.total, "imagen": url}
         return None
 
-    # 4. EJECUCIÓN DE CONSULTAS
-    top_general = obtener_top_ave() 
-    top_semana = obtener_top_ave(inicio_semana) 
-    top_dia = obtener_top_ave(datetime.now().replace(hour=0, minute=0, second=0))
-
-    # 5. RESPUESTA JSON
     return {
         "metricas": {
             "logins_hoy": logins_hoy,
-            "usuarios_totales": usuarios_activos
+            # Aquí enviamos los online, no los totales
+            "usuarios_totales": usuarios_online 
         },
         "tops": {
-            "general": top_general,
-            "semana": top_semana,
-            "dia": top_dia
+            "general": obtener_top_ave(),
+            "semana": obtener_top_ave(inicio_semana),
+            "dia": obtener_top_ave(ahora.replace(hour=0, minute=0, second=0))
         }
     }
+
 
 
