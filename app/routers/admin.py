@@ -7,7 +7,6 @@ from datetime import datetime, timedelta
 
 from db import modelos
 from servicios.hist_inferencias import obtener_inferencias_admin
-# IMPORTANTE: Agregamos 'actualizar_usuario' a los imports
 from servicios.prediccion import obtener_imagen_ave
 from servicios.sesiones import actualizar_usuario, obtener_sesiones_admin, obtener_usuario_nombre, obtener_usuarios, obtener_usuarios_inactivos_nombre
 from db.database import get_db
@@ -26,7 +25,7 @@ class EdicionUsuarioAdmin(BaseModel):
     nombre_completo: str
     email: str
     usuario_activo: bool
-    password: Optional[str] = None  # Opcional, si viene vacío no se toca
+    password: Optional[str] = None
 
 # ---------------------------------------------------------
 # 2. ENDPOINTS EXISTENTES
@@ -39,7 +38,6 @@ def listar_logs_error(
     admin = Depends(require_admin)
 ):
     logs = obtener_logs_error(db, limite)
-
     return [
         {
             "id_log": log.id_log_sis,
@@ -47,8 +45,6 @@ def listar_logs_error(
             "fuente": log.fuente,
             "fecha": log.fecha_general_log,
             "id_usuario": log.id_usuario,
-            # Nota: log_errores no suele tener usuario_activo, revisa tu modelo si esto da error
-            # "usuario_activo": log.usuario_activo 
         }
         for log in logs
     ]
@@ -58,42 +54,31 @@ def listar_usuarios(
     db: Session = Depends(get_db),
     usuario = Depends(get_current_user)
 ):
-    # Solo admins
     if usuario.role_id != 0:
-        raise HTTPException(
-            status_code=403,
-            detail="Acceso denegado, solo administradores pueden acceder a esta información."
-        )
+        raise HTTPException(status_code=403, detail="Acceso denegado.")
 
     usuarios = obtener_usuarios(db)
-
     return [
         {
             "rol": "admin" if u.role_id == 0 else "usuario",
             "id_usuario": u.id_usuario,
             "Nombre completo": u.nombre_completo,
             "email": u.email,
-            "fecha_creacion": u.fecha_creacion.strftime("%d-%m-%Y %H:%M:%S"),
+            "fecha_creacion": u.fecha_creacion.strftime("%d-%m-%Y %H:%M:%S") if u.fecha_creacion else None,
             "usuario_activo": u.usuario_activo
         }
         for u in usuarios
     ]
-
 
 @router.get("/Listar_sesiones")
 def listar_sesiones(
     db: Session = Depends(get_db),
     usuario = Depends(get_current_user)
 ):
-     # Solo admins
     if usuario.role_id != 0:
-        raise HTTPException(
-            status_code=403,
-            detail="Acceso denegado, solo administradores pueden acceder a esta información."
-        )
+        raise HTTPException(status_code=403, detail="Acceso denegado.")
     
     sesiones = obtener_sesiones_admin(db, usuario)
-
     return [
         {
             "usuario": {
@@ -114,10 +99,8 @@ def listar_sesiones(
 def listar_inferencias(
     db: Session = Depends(get_db),
     usuario = Depends(get_current_user)
-
 ):
     inferencias = obtener_inferencias_admin(db)
-
     return [
         {
             "log_id": i.log_id,
@@ -142,9 +125,8 @@ def buscar_usuarios_inactivos(
     admin = Depends(require_admin)
 ):
     usuarios = obtener_usuarios_inactivos_nombre(db, nombre)
-    
     if not usuarios:
-        raise HTTPException(404, "No se encontraron usuarios inactivos con ese nombre")
+        raise HTTPException(404, "No se encontraron usuarios inactivos.")
 
     return [
         {
@@ -157,7 +139,7 @@ def buscar_usuarios_inactivos(
     ]
 
 # ---------------------------------------------------------
-# 3. NUEVO ENDPOINT DE EDICIÓN COMPLETA (Reutilizando Servicio)
+# 3. ENDPOINTS DE EDICIÓN
 # ---------------------------------------------------------
 @router.put("/usuarios/{id_usuario}/editar")
 def editar_usuario_admin(
@@ -166,19 +148,14 @@ def editar_usuario_admin(
     db: Session = Depends(get_db),
     admin = Depends(require_admin)
 ):
-    # Convertimos el modelo Pydantic a diccionario, eliminando los nulos (como password si viene vacio)
     datos_dict = datos.dict(exclude_unset=True)
-
-    # Lógica específica de Admin: Manejo de fechas al activar/desactivar
-    # Agregamos manualmente la fecha al diccionario si es necesario
+    
     if "usuario_activo" in datos_dict:
         if not datos_dict["usuario_activo"]:
             datos_dict["fecha_desactivacion"] = datetime.now()
         else:
             datos_dict["fecha_desactivacion"] = None
 
-    # Llamamos a TU servicio existente 'actualizar_usuario'.
-    # Este servicio ya sabe que si recibe 'password', debe hashearla.
     try:
         usuario_actualizado = actualizar_usuario(
             db=db,
@@ -186,7 +163,6 @@ def editar_usuario_admin(
             datos=datos_dict
         )
     except Exception as e:
-        # Manejo básico de errores si el usuario no existe o falla la BD
         raise HTTPException(status_code=400, detail=f"Error al actualizar: {str(e)}")
 
     return {
@@ -201,35 +177,31 @@ def reactivar_usuario(
     db: Session = Depends(get_db),
     admin = Depends(require_admin)
 ):
-    usuario = db.query(modelos.Usuario).filter(
-        modelos.Usuario.id_usuario == id_usuario
-    ).first()
-
+    usuario = db.query(modelos.Usuario).filter(modelos.Usuario.id_usuario == id_usuario).first()
     if not usuario:
         raise HTTPException(404, "Usuario no encontrado")
-
     if usuario.usuario_activo:
         raise HTTPException(400, "El usuario ya está activo")
 
     usuario.usuario_activo = True
     usuario.fecha_desactivacion = None
-
     db.commit()
 
-    return {
-        "mensaje": f"Usuario {usuario.nombre_completo} reactivado correctamente"
-    }
+    return {"mensaje": f"Usuario {usuario.nombre_completo} reactivado correctamente"}
 
+# ---------------------------------------------------------
+# 4. ENDPOINT DASHBOARD STATS (CORREGIDO)
+# ---------------------------------------------------------
 @router.get("/dashboard_stats")
 def obtener_estadisticas_dashboard(
     db: Session = Depends(get_db),
-    usuario = Depends(require_admin) # Solo admin puede ver esto
+    usuario = Depends(require_admin)
 ):
     hoy = datetime.now().date()
-    inicio_semana = hoy - timedelta(days=hoy.weekday()) # Lunes de esta semana
+    inicio_semana = hoy - timedelta(days=hoy.weekday())
 
-    # 1. USUARIOS CON SESIÓN HOY (Logins exitosos hoy)
-    # CORRECCIÓN: Usamos modelos.SesionUsuario (no Sesion)
+    # 1. USUARIOS CON SESIÓN HOY
+    # CORRECCIÓN IMPORTANTE: Usamos modelos.SesionUsuario, no modelos.Sesion
     logins_hoy = db.query(modelos.SesionUsuario).filter(
         func.date(modelos.SesionUsuario.fecha_ingreso) == hoy,
         modelos.SesionUsuario.estado == "EXITOSO"
@@ -238,26 +210,23 @@ def obtener_estadisticas_dashboard(
     # 2. TOTAL USUARIOS ACTIVOS
     usuarios_activos = db.query(modelos.Usuario).filter(modelos.Usuario.usuario_activo == True).count()
 
-    # 3. FUNCIÓN AUXILIAR PARA OBTENER EL TOP 1 AVE
+    # 3. FUNCIÓN AUXILIAR TOP AVES
     def obtener_top_ave(filtro_fecha=None):
         query = db.query(
             modelos.EjecucionInferencia.prediccion_especie,
             func.count(modelos.EjecucionInferencia.prediccion_especie).label('total')
         )
         
-        # Filtro de fecha opcional
         if filtro_fecha:
             query = query.filter(modelos.EjecucionInferencia.fecha_ejecuta >= filtro_fecha)
             
-        # Agrupamos y ordenamos
         top = query.group_by(modelos.EjecucionInferencia.prediccion_especie)\
                    .order_by(desc('total'))\
                    .first()
         
         if top:
-            # Buscamos la URL de la imagen usando tu servicio existente
-            # Si no hay imagen, mandamos None para que el frontend ponga una por defecto
             try:
+                # Obtenemos la imagen usando tu función existente
                 url_imagen = obtener_imagen_ave(db, top.prediccion_especie)
             except:
                 url_imagen = None
@@ -269,12 +238,12 @@ def obtener_estadisticas_dashboard(
             }
         return None
 
-    # 4. EJECUTAMOS LAS CONSULTAS
-    top_general = obtener_top_ave() # Histórico completo
-    top_semana = obtener_top_ave(inicio_semana) # Desde el lunes
-    top_dia = obtener_top_ave(datetime.now().replace(hour=0, minute=0, second=0)) # Desde hoy a las 00:00
+    # 4. EJECUCIÓN DE CONSULTAS
+    top_general = obtener_top_ave() 
+    top_semana = obtener_top_ave(inicio_semana) 
+    top_dia = obtener_top_ave(datetime.now().replace(hour=0, minute=0, second=0))
 
-    # 5. RETORNAMOS JSON ESTRUCTURADO
+    # 5. RESPUESTA JSON
     return {
         "metricas": {
             "logins_hoy": logins_hoy,
