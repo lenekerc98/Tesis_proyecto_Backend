@@ -11,7 +11,7 @@ from servicios.seguridad import require_admin
 # from ... import modelos, get_db, require_admin, obtener_imagen_ave 
 
 router = APIRouter(
-    prefix="/dashboard",
+    prefix="v1/dashboard",
     tags=["Dashboard"]
 )
 
@@ -82,3 +82,4 @@ def obtener_estadisticas_dashboard(
             "dia": top_dia
         }
     }
+
