@@ -1,5 +1,5 @@
 from fastapi import FastAPI
-from app.routers import estado_procesos, admin, inferencias, usuarios
+from app.routers import estado_procesos, admin, inferencias, usuarios, dashboard_stats
 from fastapi.middleware.cors import CORSMiddleware
 
 app = FastAPI()
@@ -24,4 +24,5 @@ app.include_router(estado_procesos.router)
 app.include_router(usuarios.router)
 app.include_router(inferencias.router)
 app.include_router(admin.router)
+app.include_router(dashboard_stats.router)
 
