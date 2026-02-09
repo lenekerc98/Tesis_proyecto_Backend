@@ -192,7 +192,7 @@ def reactivar_usuario(
 # ---------------------------------------------------------
 # 4. ENDPOINT DASHBOARD STATS (CORREGIDO)
 # ---------------------------------------------------------
-@router.get("/v1/dashboard_stats")
+@router.get("/dashboard_stats")
 def obtener_estadisticas_dashboard(
     db: Session = Depends(get_db),
     usuario = Depends(require_admin)
@@ -255,4 +255,5 @@ def obtener_estadisticas_dashboard(
             "dia": top_dia
         }
     }
+
 
