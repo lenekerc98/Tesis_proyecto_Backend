@@ -11,8 +11,8 @@ from servicios.seguridad import require_admin
 # from ... import modelos, get_db, require_admin, obtener_imagen_ave 
 
 router = APIRouter(
-    prefix="/Dashboard",
-    tags=["Estado_Procesos"]
+    prefix="/dashboard",
+    tags=["Dashboard"]
 )
 
 
