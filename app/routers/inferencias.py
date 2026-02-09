@@ -16,7 +16,12 @@ import subprocess
 
 router = APIRouter(prefix="/v1/inferencia", tags=["Inferencia"])
 
-ALLOWED_TYPES = ["audio/wav", "audio/mpeg", "audio/webm", "audio/mp3", "audio/webm", "video/webm"]
+# 1. AMPLIAMOS TIPOS PERMITIDOS PARA IPHONE (MP4)
+ALLOWED_TYPES = [
+    "audio/wav", "audio/mpeg", "audio/mp3", 
+    "audio/webm", "video/webm", 
+    "audio/mp4", "video/mp4", "audio/aac"
+]
 MAX_SIZE_MB = 100
 MIN_DURACION = 1.0
 MAX_DURACION = 60.0
@@ -36,94 +41,54 @@ async def upload_audio(
     try:
         audio_bytes = await file.read()
     except Exception as e:
-        registrar_error_sistema(
-            db,
-            mensaje_error=str(e),
-            fuente="lectura_archivo",
-            id_usuario=usuario.id_usuario
-        )
-        raise HTTPException(status_code=400, detail="No se pudo leer el archivo, intente de nuevo.")
+        registrar_error_sistema(db, str(e), "lectura_archivo", usuario.id_usuario)
+        raise HTTPException(status_code=400, detail="No se pudo leer el archivo.")
 
     # 2. Validar tipo MIME
     if file.content_type not in ALLOWED_TYPES:
-        print(file.content_type)
-        registrar_error_sistema(
-            db,
-            mensaje_error=f"Tipo no permitido: {file.content_type}",
-            fuente="valida_tipo_archivo",
-            id_usuario=usuario.id_usuario
-        )
-        raise HTTPException(status_code=400, detail="Formato de archivo no soportado, asegurse de subir un archivo de audio válido.")
+        registrar_error_sistema(db, f"Tipo no permitido: {file.content_type}", "valida_tipo_archivo", usuario.id_usuario)
+        raise HTTPException(status_code=400, detail=f"Formato {file.content_type} no soportado.")
 
     # 3. Validar tamaño
     if len(audio_bytes) > MAX_SIZE_MB * 1024 * 1024:
-        registrar_error_sistema(
-            db,
-            mensaje_error=f"Tamaño excedido: {len(audio_bytes)} bytes",
-            fuente="valida_tamano_archivo",
-            id_usuario=usuario.id_usuario
-        )
-        raise HTTPException(status_code=413, detail="Archivo demasiado grande, el tamaño máximo es 100 MB.")
+        registrar_error_sistema(db, f"Tamaño excedido", "valida_tamano_archivo", usuario.id_usuario)
+        raise HTTPException(status_code=413, detail="Archivo demasiado grande.")
 
-    # 4. Cargar audio con librosa, convertir a wav si es necesario
+    # 4. CARGA Y CONVERSIÓN DINÁMICA
     try:
-        if file.content_type in ("audio/webm", "video/webm"):
-            audio_bytes_2 = convertir_webm_a_wav(audio_bytes)
+        # Si no es WAV, lo pasamos por FFmpeg para asegurar compatibilidad y calidad
+        if file.content_type != "audio/wav":
+            # Esta función ahora maneja webm, mp4, mp3, etc.
+            audio_bytes = convertir_audio_a_wav(audio_bytes)
 
-            y, sr = librosa.load(
-                io.BytesIO(audio_bytes_2),
-                sr=TARGET_SR,
-                mono=True
-            )
-        else:   
-            y, sr = librosa.load(
-                io.BytesIO(audio_bytes),
-                sr=TARGET_SR,
-                mono=True
-            )
-    except Exception as e:
-        registrar_error_sistema(
-            db,
-            mensaje_error=str(e),
-            fuente="carga_audio",
-            id_usuario=usuario.id_usuario
+        y, sr = librosa.load(
+            io.BytesIO(audio_bytes),
+            sr=TARGET_SR,
+            mono=True
         )
-        raise HTTPException(status_code=400, detail="No se pudo cargar el archivo de audio, intente de nuevo.")
+    except Exception as e:
+        registrar_error_sistema(db, str(e), "carga_audio", usuario.id_usuario)
+        raise HTTPException(status_code=400, detail="Error al procesar el audio.")
 
     # 5. Validar duración
     duracion = len(y) / sr
     if duracion < MIN_DURACION or duracion > MAX_DURACION:
-        registrar_error_sistema(
-            db,
-            mensaje_error=f"Duración inválida: {duracion:.2f}s",
-            fuente="valida_duracion_audio",
-            id_usuario=usuario.id_usuario
-        )
-        raise HTTPException(status_code=400, detail="Duración de audio no válida, debe ser entre 1 y 60 segundos.")
+        raise HTTPException(status_code=400, detail="El audio debe durar entre 1 y 60 segundos.")
 
     # 6. Inferencia
     inicio = perf_counter()
     try:
-        resultados = predecir_audio(
-            y, 
-            sr,
-            db=db,
-            top_n=5
-        )
+        resultados = predecir_audio(y, sr, db=db, top_n=5)
     except Exception as e:
-        registrar_error_sistema(
-            db,
-            mensaje_error=str(e),
-            fuente="proceso_inferencia_modelo",
-            id_usuario=usuario.id_usuario
-        )
-        raise HTTPException(status_code=500, detail="Error durante la inferencia, intente de nuevo más tarde.")
+        registrar_error_sistema(db, str(e), "proceso_inferencia_modelo", usuario.id_usuario)
+        raise HTTPException(status_code=500, detail="Error en el modelo de IA.")
 
     tiempo = perf_counter() - inicio
     prediccion_principal = resultados[0]["nombre_cientifico"]
     confianza = resultados[0]["probabilidad"]
     imagen_url = obtener_imagen_ave(db, prediccion_principal)
 
+    # Registrar en DB
     registrar_inferencia(
        db=db,
        id_usuario=usuario.id_usuario,
@@ -131,31 +96,64 @@ async def upload_audio(
        confianza=confianza,
        top_5=resultados,
        tiempo_ejecucion=tiempo
-)
+    )
     
+    log_id_actual = db.query(EjecucionInferencia).order_by(EjecucionInferencia.log_id.desc()).first().log_id
+
     registrar_metadata_audio(
         db=db,
         origen="Carga_desde_API",
         formato=file.content_type,
         id_usuario=usuario.id_usuario,
-        id_inferencia=db.query(EjecucionInferencia).order_by(EjecucionInferencia.log_id.desc()).first().log_id,
+        id_inferencia=log_id_actual,
         latitud=latitud if latitud else 0.0,
         longitud=longitud if longitud else 0.0,
         localizacion=localizacion if localizacion else 'No especificada'
     )
 
     return {
-    "prediccion_principal": {
-        "usuario": usuario.nombre_completo,
-        "archivo": file.filename,
-        "duracion_audio": f"{duracion:.2f} segundos.",
-        "tiempo_ejecucion": f"{tiempo:.2f} segundos.",
-        "especie": prediccion_principal,
-        "probabilidad": confianza,
-        "url_imagen": imagen_url
-    },
-    "top_5_predicciones": resultados
-}
+        "prediccion_principal": {
+            "usuario": usuario.nombre_completo,
+            "archivo": file.filename,
+            "duracion_audio": f"{duracion:.2f} s",
+            "tiempo_ejecucion": f"{tiempo:.2f} s",
+            "especie": prediccion_principal,
+            "probabilidad": confianza,
+            "url_imagen": imagen_url
+        },
+        "top_5_predicciones": resultados
+    }
+
+#--------------------------------------------------
+# MEJORA: FUNCIÓN DE CONVERSIÓN UNIVERSAL
+#--------------------------------------------------
+def convertir_audio_a_wav(audio_bytes: bytes) -> bytes:
+    """Convierte cualquier formato de audio a WAV PCM usando FFmpeg en memoria"""
+    try:
+        proceso = subprocess.Popen(
+            [
+                FFMPEG_PATH,
+                "-loglevel", "error",
+                "-i", "pipe:0", # Entrada desde memoria
+                "-ar", "44100", # Subimos a 44.1kHz para mejor calidad de captura
+                "-ac", "1",     # Mono para el modelo
+                "-f", "wav",
+                "pipe:1"        # Salida a memoria
+            ],
+            stdin=subprocess.PIPE,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE
+        )
+
+        wav_bytes, stderr = proceso.communicate(audio_bytes)
+
+        if proceso.returncode != 0:
+            raise RuntimeError(stderr.decode())
+
+        return wav_bytes
+
+    except Exception as e:
+        raise RuntimeError(f"Error en FFmpeg: {str(e)}")
 
 #--------------------------------------------------
 # LISTAR HISTORIAL DE INFERENCIAS
