@@ -13,15 +13,15 @@ from db.database import get_db
 import io
 import subprocess
 
-
 router = APIRouter(prefix="/v1/inferencia", tags=["Inferencia"])
 
-# 1. AMPLIAMOS TIPOS PERMITIDOS PARA IPHONE (MP4)
+# 1. AMPLIAMOS TIPOS PERMITIDOS PARA IPHONE (MP4) Y OTROS MÓVILES
 ALLOWED_TYPES = [
     "audio/wav", "audio/mpeg", "audio/mp3", 
     "audio/webm", "video/webm", 
-    "audio/mp4", "video/mp4", "audio/aac"
+    "audio/mp4", "video/mp4", "audio/aac", "audio/x-m4a"
 ]
+
 MAX_SIZE_MB = 100
 MIN_DURACION = 1.0
 MAX_DURACION = 60.0
@@ -47,7 +47,7 @@ async def upload_audio(
     # 2. Validar tipo MIME
     if file.content_type not in ALLOWED_TYPES:
         registrar_error_sistema(db, f"Tipo no permitido: {file.content_type}", "valida_tipo_archivo", usuario.id_usuario)
-        raise HTTPException(status_code=400, detail=f"Formato {file.content_type} no soportado.")
+        raise HTTPException(status_code=400, detail=f"Formato {file.content_type} no soportado. Use MP3, WAV, WEBM o MP4.")
 
     # 3. Validar tamaño
     if len(audio_bytes) > MAX_SIZE_MB * 1024 * 1024:
@@ -56,19 +56,21 @@ async def upload_audio(
 
     # 4. CARGA Y CONVERSIÓN DINÁMICA
     try:
-        # Si no es WAV, lo pasamos por FFmpeg para asegurar compatibilidad y calidad
+        # Si NO es WAV puro, lo pasamos por FFmpeg para estandarizar (WebM, MP4, MP3 -> WAV)
         if file.content_type != "audio/wav":
-            # Esta función ahora maneja webm, mp4, mp3, etc.
             audio_bytes = convertir_audio_a_wav(audio_bytes)
 
+        # Cargar con Librosa (desde memoria)
+        # Nota: TARGET_SR debe estar configurado en servicios.prediccion (idealmente 44100 o 48000)
         y, sr = librosa.load(
             io.BytesIO(audio_bytes),
-            sr=TARGET_SR,
+            sr=TARGET_SR, 
             mono=True
         )
     except Exception as e:
         registrar_error_sistema(db, str(e), "carga_audio", usuario.id_usuario)
-        raise HTTPException(status_code=400, detail="Error al procesar el audio.")
+        print(f"Error procesando audio: {e}")
+        raise HTTPException(status_code=400, detail="Error al procesar el audio. Verifique que el archivo no esté corrupto.")
 
     # 5. Validar duración
     duracion = len(y) / sr
@@ -81,7 +83,7 @@ async def upload_audio(
         resultados = predecir_audio(y, sr, db=db, top_n=5)
     except Exception as e:
         registrar_error_sistema(db, str(e), "proceso_inferencia_modelo", usuario.id_usuario)
-        raise HTTPException(status_code=500, detail="Error en el modelo de IA.")
+        raise HTTPException(status_code=500, detail="Error interno en el modelo de IA.")
 
     tiempo = perf_counter() - inicio
     prediccion_principal = resultados[0]["nombre_cientifico"]
@@ -98,7 +100,8 @@ async def upload_audio(
        tiempo_ejecucion=tiempo
     )
     
-    log_id_actual = db.query(EjecucionInferencia).order_by(EjecucionInferencia.log_id.desc()).first().log_id
+    log_actual = db.query(EjecucionInferencia).order_by(EjecucionInferencia.log_id.desc()).first()
+    log_id_actual = log_actual.log_id if log_actual else 0
 
     registrar_metadata_audio(
         db=db,
@@ -125,20 +128,23 @@ async def upload_audio(
     }
 
 #--------------------------------------------------
-# MEJORA: FUNCIÓN DE CONVERSIÓN UNIVERSAL
+# FUNCION CONVERSION UNIVERSAL (FFMPEG IN-MEMORY)
 #--------------------------------------------------
 def convertir_audio_a_wav(audio_bytes: bytes) -> bytes:
-    """Convierte cualquier formato de audio a WAV PCM usando FFmpeg en memoria"""
+    """
+    Convierte cualquier formato (MP4, WEBM, MP3) a WAV PCM 
+    usando FFmpeg en memoria con alta calidad (44.1kHz).
+    """
     try:
         proceso = subprocess.Popen(
             [
                 FFMPEG_PATH,
                 "-loglevel", "error",
-                "-i", "pipe:0", # Entrada desde memoria
-                "-ar", "44100", # Subimos a 44.1kHz para mejor calidad de captura
-                "-ac", "1",     # Mono para el modelo
-                "-f", "wav",
-                "pipe:1"        # Salida a memoria
+                "-i", "pipe:0",  # Entrada stdin
+                "-ar", "44100",  # IMPORTANTE: Subimos a 44.1kHz para captar agudos de aves
+                "-ac", "1",      # Mono
+                "-f", "wav",     # Salida WAV
+                "pipe:1"         # Salida stdout
             ],
             stdin=subprocess.PIPE,
             stdout=subprocess.PIPE,
@@ -148,17 +154,19 @@ def convertir_audio_a_wav(audio_bytes: bytes) -> bytes:
         wav_bytes, stderr = proceso.communicate(audio_bytes)
 
         if proceso.returncode != 0:
-            raise RuntimeError(stderr.decode())
+            error_msg = stderr.decode()
+            print(f"Error FFMPEG: {error_msg}")
+            raise RuntimeError(f"FFmpeg falló: {error_msg}")
 
         return wav_bytes
 
     except Exception as e:
-        raise RuntimeError(f"Error en FFmpeg: {str(e)}")
+        raise RuntimeError(f"Error convirtiendo audio a WAV: {str(e)}")
+
 
 #--------------------------------------------------
 # LISTAR HISTORIAL DE INFERENCIAS
 #--------------------------------------------------
-
 @router.get("/historial")
 def listar_inferencias(
     db: Session = Depends(get_db),
@@ -182,39 +190,6 @@ def listar_inferencias(
         }
         for i in inferencias
     ]
-#--------------------------------------------------
-# FUNCION CONVERSION WEBM A WAV (FFMPEG IN-MEMORY)
-#--------------------------------------------------
-def convertir_webm_a_wav(audio_bytes: bytes) -> bytes:
-
-#Convierte audio WEBM (Opus) a WAV PCM 16kHz mono usando FFmpeg (in-memory)
-
-    try:
-        proceso = subprocess.Popen(
-            [
-                FFMPEG_PATH,
-                "-loglevel", "error",
-                "-i", "pipe:0",
-                "-ar", "16000",
-                "-ac", "1",
-                "-f", "wav",
-                "pipe:1"
-            ],
-            stdin=subprocess.PIPE,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE
-        )
-
-        wav_bytes, stderr = proceso.communicate(audio_bytes)
-
-        if proceso.returncode != 0:
-            raise RuntimeError(stderr.decode())
-
-        return wav_bytes
-
-    except Exception as e:
-        raise RuntimeError(f"Error convirtiendo WEBM a WAV: {str(e)}")
-
 
 #--------------------------------------------------
 # LISTAR AVES REGISTRADAS EN SISTEMA
@@ -224,9 +199,7 @@ def listar_aves(
     db: Session = Depends(get_db),
     usuario = Depends(get_current_user)
 ):
-
     aves = obtener_aves(db)
-
     return [
         {
             "id_ave": u.id_ave,
@@ -246,9 +219,7 @@ def predicciones_mas_frecuentes(
     db: Session = Depends(get_db),
     usuario = Depends(get_current_user)
 ):
-  
     resultados = obtener_predicciones_mas_frecuentes(db)
-
     return [
         {
             "prediccion_especie": r.prediccion_especie,
@@ -265,9 +236,7 @@ def predicciones_mas_frecuentes_usuario(
     db: Session = Depends(get_db),
     usuario = Depends(get_current_user)
 ):
-
     resultados = obtener_predicciones_mas_frecuentes_usuario(db, usuario)
-
     return {
         "usuario": usuario.nombre_completo,
         "predicciones": [
@@ -277,5 +246,4 @@ def predicciones_mas_frecuentes_usuario(
             }
             for r in resultados
         ]
-
     }
