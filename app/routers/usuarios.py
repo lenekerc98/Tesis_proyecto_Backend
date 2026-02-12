@@ -76,6 +76,10 @@ def login(
             agente=request.headers.get("user-agent"),
             observacion="Contraseña incorrecta"
         )
+        raise HTTPException(
+            status_code=401,
+            detail="Contraseña inválida, intente de nuevo."
+        )
 
 
     # SOLO SI TODO FUE CORRECTO
@@ -193,4 +197,5 @@ def read_users_me(usuario = Depends(get_current_user)):
         "role": "admin" if usuario.role_id == 0 else "usuario",
         "usuario_activo": usuario.usuario_activo
     }
+
 #--------------------------------------------------
