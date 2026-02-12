@@ -74,39 +74,85 @@ def predecir_audio(
     y: np.ndarray,
     sr: int,
     db: Session,
-    top_n: int = 5
+    top_n: int = 5,
+    threshold: float = 0.60  # Nuevo umbral de confianza
 ):
-
-    # 1. Limpieza
+    # 1. Limpieza inicial
     y = limpiar_audio(y)
 
-    # 2. Log-mel
-    S = audio_a_logmel(y, sr)
+    # 2. Configuración de Ventana Deslizante (Sliding Window)
+    # 216 frames * 512 hop_length / 44100 sr ~= 2.5 segundos
+    # Usaremos ventanas de ~2.5s con 50% de superposición (overlap)
+    samples_per_window = int(2.5 * sr)
+    step = int(samples_per_window * 0.5)  # 50% overlap
 
-    # 3. Tensor (1, 128, 216, 1)
-    X = S[np.newaxis, ..., np.newaxis]
+    # Si el audio es muy corto, lo tratamos como una sola ventana
+    if len(y) <= samples_per_window:
+        windows = [y]
+    else:
+        # Generar ventanas
+        windows = []
+        for start in range(0, len(y) - samples_per_window + 1, step):
+            end = start + samples_per_window
+            windows.append(y[start:end])
+        
+        # Asegurar que el último fragmento se procese si es significativo
+        if len(y) > samples_per_window and (len(y) - step) % samples_per_window != 0:
+            windows.append(y[-samples_per_window:])
 
-    # 4. Inferencia
-    probs = model.predict(X)[0]
+    # 3. Predicción por lotes (Batch Prediction)
+    batch_X = []
+    for window in windows:
+        S = audio_a_logmel(window, sr)
+        # Añadir eje de canal: (128, 216) -> (128, 216, 1)
+        X = S[..., np.newaxis]
+        batch_X.append(X)
 
-    # 5 . Top-N
-    top_indices = np.argsort(probs)[::-1][:top_n]
+    batch_X = np.array(batch_X) # Shape: (N_ventanas, 128, 216, 1)
+
+    # Ejecutar inferencia en todo el lote
+    # probs_batch shape: (N_ventanas, N_clases)
+    probs_batch = model.predict(batch_X)
+
+    # 4. Agregación de resultados (MAX pooling)
+    # Tomamos la probabilidad máxima observada para cada especie a través de todas las ventanas.
+    # Esto ayuda a detectar el ave incluso si solo canta en un pequeño fragmento.
+    max_probs = np.max(probs_batch, axis=0)
+
+    # 5. Top-N y Umbral de Confianza
+    top_indices = np.argsort(max_probs)[::-1][:top_n]
+    
+    # Verificación del mejor resultado contra el umbral
+    best_idx = top_indices[0]
+    best_prob = float(max_probs[best_idx])
 
     resultados = []
 
-    for idx in top_indices:
-        ave = (
-            db.query(Ave)
-            .filter(Ave.id_ave == int(idx))
-            .first()
-        )
-
+    if best_prob < threshold:
+        # Si no supera el umbral, devolvemos un resultado "vacío" o de "ruido"
         resultados.append({
-            "id_ave": int(idx),
-            "nombre_cientifico": ave.nombre_cientifico if ave else "desconocido",
-            "nombre": ave.nombre if ave else "desconocido",
-            "probabilidad": float(probs[idx])
+            "id_ave": 0, # ID reservado o ficticio
+            "nombre_cientifico": "Desconocido",
+            "nombre": "No se detectó ave (Baja confianza)",
+            "probabilidad": best_prob
         })
+        # Rellenamos el resto con los que haya, aunque sean bajos, o simplemente cortamos aquí
+        # Para mantener el formato top-5, podemos agregar los siguientes marcados como baja confianza
+    else:
+        # Procesamiento normal de los Top-N
+        for idx in top_indices:
+            ave = (
+                db.query(Ave)
+                .filter(Ave.id_ave == int(idx))
+                .first()
+            )
+
+            resultados.append({
+                "id_ave": int(idx),
+                "nombre_cientifico": ave.nombre_cientifico if ave else "desconocido",
+                "nombre": ave.nombre if ave else "desconocido",
+                "probabilidad": float(max_probs[idx])
+            })
 
     return resultados
 #-----------------------------------------------------------

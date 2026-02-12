@@ -27,6 +27,8 @@ MIN_DURACION = 1.0
 MAX_DURACION = 60.0
 FFMPEG_PATH = "ffmpeg"
 
+from starlette.concurrency import run_in_threadpool
+
 @router.post("/procesar_inferencia")
 async def upload_audio(
     file: UploadFile = File(...),
@@ -58,11 +60,14 @@ async def upload_audio(
     try:
         # Si NO es WAV puro, lo pasamos por FFmpeg para estandarizar (WebM, MP4, MP3 -> WAV)
         if file.content_type != "audio/wav":
-            audio_bytes = convertir_audio_a_wav(audio_bytes)
+            # Ejecutar conversión en threadpool porque es CPU-bound
+            audio_bytes = await run_in_threadpool(convertir_audio_a_wav, audio_bytes)
 
         # Cargar con Librosa (desde memoria)
         # Nota: TARGET_SR debe estar configurado en servicios.prediccion (idealmente 44100 o 48000)
-        y, sr = librosa.load(
+        # Ejecutar carga en threadpool
+        y, sr = await run_in_threadpool(
+            librosa.load,
             io.BytesIO(audio_bytes),
             sr=TARGET_SR, 
             mono=True
@@ -80,7 +85,8 @@ async def upload_audio(
     # 6. Inferencia
     inicio = perf_counter()
     try:
-        resultados = predecir_audio(y, sr, db=db, top_n=5)
+        # Ejecutar inferencia en threadpool (Heavy CPU usage)
+        resultados = await run_in_threadpool(predecir_audio, y, sr, db=db, top_n=5)
     except Exception as e:
         registrar_error_sistema(db, str(e), "proceso_inferencia_modelo", usuario.id_usuario)
         raise HTTPException(status_code=500, detail="Error interno en el modelo de IA.")
