@@ -25,6 +25,7 @@ class EdicionUsuarioAdmin(BaseModel):
     nombre_completo: str
     email: str
     usuario_activo: bool
+    role_id: Optional[int] = None # Nuevo campo rol
     password: Optional[str] = None
 
 # ---------------------------------------------------------

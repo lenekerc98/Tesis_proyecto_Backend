@@ -161,6 +161,9 @@ def actualizar_usuario(
     if "usuario_activo" in datos:
         usuario.usuario_activo = datos["usuario_activo"]
 
+    if "role_id" in datos and datos["role_id"] is not None:
+        usuario.role_id = datos["role_id"]
+
     db.commit()
     db.refresh(usuario)
 
