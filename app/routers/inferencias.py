@@ -96,6 +96,11 @@ async def upload_audio(
     confianza = resultados[0]["probabilidad"]
     imagen_url = obtener_imagen_ave(db, prediccion_principal)
 
+    tiempo = perf_counter() - inicio
+    prediccion_principal = resultados[0]["nombre_cientifico"]
+    confianza = resultados[0]["probabilidad"]
+    imagen_url = obtener_imagen_ave(db, prediccion_principal)
+
     # Registrar en DB
     registrar_inferencia(
        db=db,

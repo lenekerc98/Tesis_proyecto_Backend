@@ -226,6 +226,10 @@ def obtener_estadisticas_dashboard(
         query = db.query(
             modelos.EjecucionInferencia.prediccion_especie,
             func.count(modelos.EjecucionInferencia.prediccion_especie).label('total')
+        ).filter(
+            modelos.EjecucionInferencia.prediccion_especie.isnot(None),
+            modelos.EjecucionInferencia.prediccion_especie != "Desconocido",
+            modelos.EjecucionInferencia.prediccion_especie != ""
         )
         if filtro_fecha:
             query = query.filter(modelos.EjecucionInferencia.fecha_ejecuta >= filtro_fecha)
