@@ -197,6 +197,7 @@ def listar_inferencias(
             "url_imagen": obtener_imagen_ave(db, i.prediccion_especie),
             "latitud": i.meta_audio.latitud if i.meta_audio else None,
             "longitud": i.meta_audio.longitud if i.meta_audio else None,
+            "especie_usuario": i.especie_usuario
             "top_5": i.top_5
         }
         for i in inferencias
@@ -282,3 +283,4 @@ def agregar_especie_usuario(
     db.commit()
 
     return {"mensaje": "Especie de usuario añadida a la inferencia."}
+
