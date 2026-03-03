@@ -258,3 +258,27 @@ def predicciones_mas_frecuentes_usuario(
             for r in resultados
         ]
     }
+
+#-----------------------------------------------------------
+# AÑADIR ESPECIE INDICADA POR USUARIO A LA INFERENCIA
+#-----------------------------------------------------------
+@router.post("/especie_usuario")
+def agregar_especie_usuario(
+    log_id: int = Form(...),
+    especie_usuario: str = Form(...),
+    db: Session = Depends(get_db),
+    usuario = Depends(get_current_user)
+):
+
+    inferencia = db.query(EjecucionInferencia).filter(EjecucionInferencia.log_id == log_id).first()
+
+    if not inferencia:
+        raise HTTPException(status_code=404, detail="Inferencia no encontrada.")
+
+    if inferencia.id_usuario != usuario.id_usuario:
+        raise HTTPException(status_code=403, detail="No tienes permiso para modificar esta inferencia.")
+
+    inferencia.especie_usuario = especie_usuario
+    db.commit()
+
+    return {"mensaje": "Especie de usuario añadida a la inferencia."}
