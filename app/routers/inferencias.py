@@ -296,8 +296,8 @@ def guardar_grabacion_s3(
     ):
 
     # Configuración de AWS S3
-    aws_access_key_id = "dummy"
-    aws_secret_access_key = "summy"
+    aws_access_key_id = "AKIAQEFWASWGWWZABDET"
+    aws_secret_access_key = "kQu3H1l9aNfUmTKK6FggGdVdEwcIArZ3wOVevJt6"
     s3 = boto3.client('s3', aws_access_key_id=aws_access_key_id, aws_secret_access_key=aws_secret_access_key, region_name='us-east-1')
     bucket_name = 'aves-cerro-blanco-img'
     object_key = f"grabaciones/{int(log_id)}_{meta.filename}"
@@ -328,5 +328,6 @@ def guardar_grabacion_s3(
             id_usuario=db.query(EjecucionInferencia).filter(EjecucionInferencia.log_id == log_id).first().id_usuario if db.query(EjecucionInferencia).filter(EjecucionInferencia.log_id == log_id).first() else None
         )
         raise HTTPException(status_code=500, detail="Error al guardar la grabación, intente de nuevo más tarde.")
+
 
 
