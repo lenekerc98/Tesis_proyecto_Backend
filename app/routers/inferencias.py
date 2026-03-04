@@ -188,6 +188,7 @@ def listar_inferencias(
     return [
         {
             "log_id": i.log_id,
+            "url_grabacion": i.url_grabacion,
             "prediccion": i.prediccion_especie,
             "confianza": i.confianza,
             "tiempo_ejecucion": i.tiempo_ejecucion,
@@ -327,4 +328,5 @@ def guardar_grabacion_s3(
             id_usuario=db.query(EjecucionInferencia).filter(EjecucionInferencia.log_id == log_id).first().id_usuario if db.query(EjecucionInferencia).filter(EjecucionInferencia.log_id == log_id).first() else None
         )
         raise HTTPException(status_code=500, detail="Error al guardar la grabación, intente de nuevo más tarde.")
+
 
