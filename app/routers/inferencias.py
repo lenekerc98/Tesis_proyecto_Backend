@@ -12,6 +12,7 @@ from servicios.prediccion import TARGET_SR, obtener_imagen_ave, predecir_audio
 from db.database import get_db
 import io
 import subprocess
+import boto3
 
 router = APIRouter(prefix="/v1/inferencia", tags=["Inferencia"])
 
@@ -328,6 +329,7 @@ def guardar_grabacion_s3(
             id_usuario=db.query(EjecucionInferencia).filter(EjecucionInferencia.log_id == log_id).first().id_usuario if db.query(EjecucionInferencia).filter(EjecucionInferencia.log_id == log_id).first() else None
         )
         raise HTTPException(status_code=500, detail="Error al guardar la grabación, intente de nuevo más tarde.")
+
 
 
 
