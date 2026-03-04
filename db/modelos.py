@@ -52,6 +52,7 @@ class EjecucionInferencia(Base):
     tiempo_ejecucion = Column(Float)
     fecha_ejecuta = Column(DateTime(timezone=True), server_default=func.now())
     especie_usuario = Column(String, nullable=True)
+    url_grabacion = Column(String, nullable=True)
     
     meta_audio = relationship("MetadatoAudio", back_populates="id_inferencia_rel", uselist=False)
 
@@ -78,4 +79,5 @@ class MetadatoAudio(Base):
     id_inferencia = Column(Integer, ForeignKey("ejecuciones_inferencias.log_id"), nullable=True)
 
     id_inferencia_rel = relationship("EjecucionInferencia", back_populates="meta_audio")
+
 
