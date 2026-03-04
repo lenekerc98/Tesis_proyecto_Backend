@@ -105,7 +105,6 @@ async def upload_audio(
     # Registrar en DB
     registrar_inferencia(
        db=db,
-       url_grabacion=None,  # Se actualizará después de subir a S3
        id_usuario=usuario.id_usuario,
        prediccion_especie=prediccion_principal,
        confianza=confianza,
@@ -337,6 +336,7 @@ def guardar_grabacion_s3(
             id_usuario=db.query(EjecucionInferencia).filter(EjecucionInferencia.log_id == log_id).first().id_usuario if db.query(EjecucionInferencia).filter(EjecucionInferencia.log_id == log_id).first() else None
         )
         raise HTTPException(status_code=500, detail="Error al guardar la grabación, intente de nuevo más tarde.")
+
 
 
 
