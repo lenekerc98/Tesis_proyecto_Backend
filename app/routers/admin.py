@@ -105,6 +105,7 @@ def listar_inferencias(
     return [
         {
             "log_id": i.log_id,
+            "url_grabacion": i.url_grabacion,
             "prediccion": i.prediccion_especie,
             "confianza": i.confianza,
             "tiempo_ejecucion": i.tiempo_ejecucion,
@@ -114,6 +115,7 @@ def listar_inferencias(
             "url_imagen": obtener_imagen_ave(db, i.prediccion_especie),
             "latitud": i.meta_audio.latitud if i.meta_audio else None,
             "longitud": i.meta_audio.longitud if i.meta_audio else None,
+            "especie_usuario": i.especie_usuario,
             "top_5": i.top_5
         }
         for i in inferencias
