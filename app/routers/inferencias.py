@@ -283,5 +283,48 @@ def agregar_especie_usuario(
     db.commit()
 
     return {"mensaje": "Especie de usuario añadida a la inferencia."}
+    
+#---------------------------------------------------------------
+# GUARDAR GRABACION EN S3 Y REGISTRAR URL EN LOG DE INFERENCIA
+#---------------------------------------------------------------
+def guardar_grabacion_s3(
+    audio_bytes: bytes,
+    meta: UploadFile = File(...),
+    log_id: int = Form(...),
+    db: Session = Depends(get_db)
+    ):
 
+    # Configuración de AWS S3
+    aws_access_key_id = "dummy"
+    aws_secret_access_key = "summy"
+    s3 = boto3.client('s3', aws_access_key_id=aws_access_key_id, aws_secret_access_key=aws_secret_access_key, region_name='us-east-1')
+    bucket_name = 'aves-cerro-blanco-img'
+    object_key = f"grabaciones/{int(log_id)}_{meta.filename}"
+
+    try:
+        # Subir archivo a S3
+        s3.put_object(Body=audio_bytes, Bucket=bucket_name, Key=object_key)
+
+        # Obtener URL pública del archivo subido
+        url_grabacion = f"https://{bucket_name}.s3.us-east-1.amazonaws.com/{object_key}"
+
+        # Actualizar registro de inferencia con URL de grabación
+        inferencia = db.query(EjecucionInferencia).filter(EjecucionInferencia.log_id == log_id).first()
+
+        if not inferencia:
+            raise HTTPException(status_code=404, detail="Inferencia no encontrada.")
+
+        inferencia.url_grabacion = url_grabacion
+        db.commit()
+
+        return {"mensaje": "Grabación guardada en S3 y URL registrada en la inferencia."}
+
+    except Exception as e:
+        registrar_error_sistema(
+            db,
+            mensaje_error=str(e),
+            fuente="guardar_grabacion_s3",
+            id_usuario=db.query(EjecucionInferencia).filter(EjecucionInferencia.log_id == log_id).first().id_usuario if db.query(EjecucionInferencia).filter(EjecucionInferencia.log_id == log_id).first() else None
+        )
+        raise HTTPException(status_code=500, detail="Error al guardar la grabación, intente de nuevo más tarde.")
 
