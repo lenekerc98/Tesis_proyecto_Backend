@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import desc, func
 from sqlalchemy.orm import Session
 from pydantic import BaseModel
@@ -98,28 +98,50 @@ def listar_sesiones(
 
 @router.get("/historial")
 def listar_inferencias(
+    page: int = Query(None, ge=1),
+    limit: int = Query(None, ge=1),
     db: Session = Depends(get_db),
     usuario = Depends(get_current_user)
 ):
-    inferencias = obtener_inferencias_admin(db)
-    return [
-        {
+    skip = (page - 1) * limit if page and limit else 0
+    # 1. Traemos las inferencias
+    # NOTA: Metadatos ya vienen por outerjoin en el servicio
+    total, inferencias = obtener_inferencias_admin(db, skip, limit)
+    
+    # 2. OPTIMIZACIÓN: Traemos todas las aves una sola vez para mapear fotos
+    aves = db.query(modelos.Ave.nombre_cientifico, modelos.Ave.url_imagen).all()
+    mapa_fotos = {a.nombre_cientifico: a.url_imagen for a in aves}
+
+    # 3. OPTIMIZACIÓN: Mapear usuarios para no consultar uno por uno en el loop
+    usuarios_ids = list(set(i.id_usuario for i in inferencias if i.id_usuario))
+    mapa_usuarios = {}
+    if usuarios_ids:
+        users = db.query(modelos.Usuario.id_usuario, modelos.Usuario.nombre_completo)\
+                  .filter(modelos.Usuario.id_usuario.in_(usuarios_ids)).all()
+        mapa_usuarios = {u.id_usuario: u.nombre_completo for u in users}
+
+    # 4. Construimos la respuesta rápidamente
+    resultado = []
+    for i in inferencias:
+        resultado.append({
             "log_id": i.log_id,
             "url_grabacion": i.url_grabacion,
             "prediccion": i.prediccion_especie,
             "confianza": i.confianza,
             "tiempo_ejecucion": i.tiempo_ejecucion,
             "fecha": i.fecha_ejecuta,
-            "usuario": db.query(modelos.Usuario).filter(modelos.Usuario.id_usuario == i.id_usuario).first().nombre_completo if i.id_usuario else "Anónimo",
+            "usuario": mapa_usuarios.get(i.id_usuario, "Anónimo") if i.id_usuario else "Anónimo",
             "ubicacion": i.meta_audio.localizacion if i.meta_audio else "No disponible",
-            "url_imagen": obtener_imagen_ave(db, i.prediccion_especie),
+            "url_imagen": mapa_fotos.get(i.prediccion_especie),
             "latitud": i.meta_audio.latitud if i.meta_audio else None,
             "longitud": i.meta_audio.longitud if i.meta_audio else None,
             "especie_usuario": i.especie_usuario,
             "top_5": i.top_5
-        }
-        for i in inferencias
-    ]
+        })
+    
+    if page and limit:
+        return {"total": total, "pagina": page, "limite": limit, "historial": resultado}
+    return resultado
 
 @router.get("/usuarios_inactivos/buscar")
 def buscar_usuarios_inactivos(

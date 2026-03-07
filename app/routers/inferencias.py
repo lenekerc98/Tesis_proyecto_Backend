@@ -1,5 +1,5 @@
 from time import perf_counter
-from fastapi import APIRouter, Form, UploadFile, File, Depends, HTTPException
+from fastapi import APIRouter, Form, UploadFile, File, Depends, HTTPException, Query
 import librosa
 from sqlalchemy.orm import Session
 from servicios.sesiones import obtener_aves, obtener_predicciones_mas_frecuentes, obtener_predicciones_mas_frecuentes_usuario
@@ -102,36 +102,37 @@ async def upload_audio(
     confianza = resultados[0]["probabilidad"]
     imagen_url = obtener_imagen_ave(db, prediccion_principal)
 
-    # Registrar en DB
-    registrar_inferencia(
-       db=db,
-       id_usuario=usuario.id_usuario,
-       prediccion_especie=prediccion_principal,
-       confianza=confianza,
-       top_5=resultados,
-       tiempo_ejecucion=tiempo
-    )
-    
-    log_actual = db.query(EjecucionInferencia).order_by(EjecucionInferencia.log_id.desc()).first()
-    log_id_actual = log_actual.log_id if log_actual else 0
+    if prediccion_principal.lower() != "desconocido":
+        # Registrar en DB
+        registrar_inferencia(
+            db=db,
+            id_usuario=usuario.id_usuario,
+            prediccion_especie=prediccion_principal,
+            confianza=confianza,
+            top_5=resultados,
+            tiempo_ejecucion=tiempo
+        )
+        
+        log_actual = db.query(EjecucionInferencia).order_by(EjecucionInferencia.log_id.desc()).first()
+        log_id_actual = log_actual.log_id if log_actual else 0
 
-    registrar_metadata_audio(
-        db=db,
-        origen="Carga_desde_API",
-        formato=file.content_type,
-        id_usuario=usuario.id_usuario,
-        id_inferencia=log_id_actual,
-        latitud=latitud if latitud else 0.0,
-        longitud=longitud if longitud else 0.0,
-        localizacion=localizacion if localizacion else 'No especificada'
-    )
+        registrar_metadata_audio(
+            db=db,
+            origen="Carga_desde_API",
+            formato=file.content_type,
+            id_usuario=usuario.id_usuario,
+            id_inferencia=log_id_actual,
+            latitud=latitud if latitud else 0.0,
+            longitud=longitud if longitud else 0.0,
+            localizacion=localizacion if localizacion else 'No especificada'
+        )
 
-    guardar_grabacion_s3(
-        audio_bytes=audio_bytes,
-        meta=file,
-        log_id=db.query(EjecucionInferencia).order_by(EjecucionInferencia.log_id.desc()).first().log_id,
-        db=db
-    )
+        guardar_grabacion_s3(
+            audio_bytes=audio_bytes,
+            meta=file,
+            log_id=log_id_actual,
+            db=db
+        )
     
     return {
         "prediccion_principal": {
@@ -188,29 +189,41 @@ def convertir_audio_a_wav(audio_bytes: bytes) -> bytes:
 #--------------------------------------------------
 @router.get("/historial")
 def listar_inferencias(
+    page: int = Query(None, ge=1),
+    limit: int = Query(None, ge=1),
     db: Session = Depends(get_db),
     usuario = Depends(get_current_user)
 ):
-    inferencias = obtener_inferencias(db, usuario)
+    skip = (page - 1) * limit if page and limit else 0
+    # 1. Traemos las inferencias del usuario
+    total, inferencias = obtener_inferencias(db, usuario, skip, limit)
+    
+    # 2. OPTIMIZACIÓN: Traemos aves de un solo golpe
+    aves = db.query(modelos.Ave.nombre_cientifico, modelos.Ave.url_imagen).all()
+    mapa_fotos = {a.nombre_cientifico: a.url_imagen for a in aves}
 
-    return [
-        {
+    # 3. Mapeo rápido
+    resultado = []
+    for i in inferencias:
+        resultado.append({
             "log_id": i.log_id,
             "url_grabacion": i.url_grabacion,
             "prediccion": i.prediccion_especie,
             "confianza": i.confianza,
             "tiempo_ejecucion": i.tiempo_ejecucion,
             "fecha": i.fecha_ejecuta,
-            "usuario": db.query(modelos.Usuario).filter(modelos.Usuario.id_usuario == i.id_usuario).first().nombre_completo if i.id_usuario else "Anónimo",
+            "usuario": usuario.nombre_completo, # Ya lo tenemos en el objeto 'usuario' de inyección
             "ubicacion": i.meta_audio.localizacion if i.meta_audio else "No disponible",
-            "url_imagen": obtener_imagen_ave(db, i.prediccion_especie),
+            "url_imagen": mapa_fotos.get(i.prediccion_especie),
             "latitud": i.meta_audio.latitud if i.meta_audio else None,
             "longitud": i.meta_audio.longitud if i.meta_audio else None,
             "especie_usuario": i.especie_usuario,
             "top_5": i.top_5
-        }
-        for i in inferencias
-    ]
+        })
+
+    if page and limit:
+        return {"total": total, "pagina": page, "limite": limit, "historial": resultado}
+    return resultado
 
 #--------------------------------------------------
 # LISTAR AVES REGISTRADAS EN SISTEMA

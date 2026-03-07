@@ -1,3 +1,6 @@
+import os
+os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'  # Silenciar mensajes de INFO y WARNING de TensorFlow
+
 from fastapi import FastAPI
 from app.routers import estado_procesos, admin, inferencias, usuarios, dashboard_stats
 from fastapi.middleware.cors import CORSMiddleware

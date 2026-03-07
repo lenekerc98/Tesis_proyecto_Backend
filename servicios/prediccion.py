@@ -75,7 +75,7 @@ def predecir_audio(
     sr: int,
     db: Session,
     top_n: int = 5,
-    threshold: float = 0.60  # Nuevo umbral de confianza
+    threshold: float = 0.65  # Umbral de confianza más estricto
 ):
     # 1. Limpieza inicial
     y = limpiar_audio(y)
@@ -136,16 +136,15 @@ def predecir_audio(
             "nombre": "No se detectó ave (Baja confianza)",
             "probabilidad": best_prob
         })
-        # Rellenamos el resto con los que haya, aunque sean bajos, o simplemente cortamos aquí
-        # Para mantener el formato top-5, podemos agregar los siguientes marcados como baja confianza
     else:
+        # Optimización: Consultar los 5 aves de un golpe a la base de datos
+        ids_buscar = [int(idx) for idx in top_indices]
+        aves_db = db.query(Ave).filter(Ave.id_ave.in_(ids_buscar)).all()
+        mapa_aves = {ave.id_ave: ave for ave in aves_db}
+
         # Procesamiento normal de los Top-N
         for idx in top_indices:
-            ave = (
-                db.query(Ave)
-                .filter(Ave.id_ave == int(idx))
-                .first()
-            )
+            ave = mapa_aves.get(int(idx))
 
             resultados.append({
                 "id_ave": int(idx),

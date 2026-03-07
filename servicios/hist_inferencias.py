@@ -23,29 +23,48 @@ def registrar_inferencia(
     db.commit()
 
 
-def obtener_inferencias(db: Session, usuario):
-
-    query = db.query(EjecucionInferencia)
-
-    return (
-        query
+def obtener_inferencias(db: Session, usuario, skip: int = 0, limit: int = None):
+    # Contamos el total sin hacer JOIN para que sea muy rápido
+    total = (
+        db.query(EjecucionInferencia)
         .filter(EjecucionInferencia.id_usuario == usuario.id_usuario)
-        .outerjoin(MetadatoAudio, EjecucionInferencia.log_id == MetadatoAudio.id_inferencia)
-        .order_by(EjecucionInferencia.fecha_ejecuta.desc())
-        .all()
+        .filter(EjecucionInferencia.prediccion_especie.not_ilike("%desconocido%"))
+        .count()
     )
 
-
-def obtener_inferencias_admin(db: Session):
-
-    query = db.query(EjecucionInferencia)
-
-    return (
-        query
+    query = (
+        db.query(EjecucionInferencia)
+        .filter(EjecucionInferencia.id_usuario == usuario.id_usuario)
+        .filter(EjecucionInferencia.prediccion_especie.not_ilike("%desconocido%"))
         .outerjoin(MetadatoAudio, EjecucionInferencia.log_id == MetadatoAudio.id_inferencia)
-        .order_by(EjecucionInferencia.fecha_ejecuta.desc())
-        .all()
     )
+    
+    if limit is not None:
+        query = query.order_by(EjecucionInferencia.fecha_ejecuta.desc()).offset(skip).limit(limit)
+    else:
+        query = query.order_by(EjecucionInferencia.fecha_ejecuta.desc())
+    return total, query.all()
+
+
+def obtener_inferencias_admin(db: Session, skip: int = 0, limit: int = None):
+    # Contamos el total sin hacer JOIN para que sea muy rápido
+    total = (
+        db.query(EjecucionInferencia)
+        .filter(EjecucionInferencia.prediccion_especie.not_ilike("%desconocido%"))
+        .count()
+    )
+
+    query = (
+        db.query(EjecucionInferencia)
+        .filter(EjecucionInferencia.prediccion_especie.not_ilike("%desconocido%"))
+        .outerjoin(MetadatoAudio, EjecucionInferencia.log_id == MetadatoAudio.id_inferencia)
+    )
+    
+    if limit is not None:
+        query = query.order_by(EjecucionInferencia.fecha_ejecuta.desc()).offset(skip).limit(limit)
+    else:
+        query = query.order_by(EjecucionInferencia.fecha_ejecuta.desc())
+    return total, query.all()
 
 
 def registrar_metadata_audio(
