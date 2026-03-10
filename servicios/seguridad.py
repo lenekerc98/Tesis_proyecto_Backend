@@ -8,8 +8,11 @@ from db.database import get_db
 from db.modelos import Usuario
 import hashlib
 import bcrypt
+import secrets
 
-SECRET_KEY = "Atom_0909"
+# Generar un SECRET_KEY aleatorio cada vez que se reinicie el servidor
+# Esto invalidará todos los tokens (sesiones/cache) generados previamente.
+SECRET_KEY = secrets.token_hex(32)
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 60
 ADMIN_ROLE_ID = 0

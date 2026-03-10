@@ -107,6 +107,28 @@ def login(
     }
 
 #--------------------------------------------------
+# CERRAR SESIÓN.
+#--------------------------------------------------
+@router.post("/logout")
+def logout(
+    request: Request,
+    db: Session = Depends(get_db),
+    usuario = Depends(get_current_user)
+):
+    from servicios.sesiones import registrar_cierre_sesion
+    
+    registrar_cierre_sesion(
+        db=db,
+        id_usuario=usuario.id_usuario,
+        estado="EXITOSO",
+        ip=request.client.host,
+        agente=request.headers.get("user-agent"),
+        observacion="Cierre de sesión (Logout)"
+    )
+    
+    return {"mensaje": "Sesión cerrada correctamente en el servidor."}
+
+#--------------------------------------------------
 # RUTAS PROTEGIDAS - USUARIOS LOGEADOS
 #--------------------------------------------------
 @router.get("/Listar_sesiones")

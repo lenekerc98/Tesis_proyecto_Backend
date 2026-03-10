@@ -50,6 +50,29 @@ def registrar_sesion_usuario_fallido(
     db.commit()
 
 # ------------------------------------------------------------------
+# LOG DE CIERRE DE SESION
+# ------------------------------------------------------------------
+def registrar_cierre_sesion(
+    db: Session,
+    id_usuario: int,
+    estado: str = "EXITOSO",
+    ip: str = None,
+    agente: str = None,
+    observacion: str = "Cierre de sesión manual"
+):
+    sesion = SesionUsuario(
+        id_usuario=id_usuario,
+        ip_origen=ip,
+        agente=agente,
+        observacion=observacion,
+        estado=estado
+    )
+    db.add(sesion)
+    db.commit()
+    db.refresh(sesion)
+    return sesion
+
+# ------------------------------------------------------------------
 # CONSULTAS SESIONES PARA USUARIO LOGEADO
 # ------------------------------------------------------------------
 def obtener_sesiones(db: Session, usuario):
